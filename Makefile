@@ -40,7 +40,7 @@ build:
 	cd ./src/u-boot-$(UBOOT_V);					\
 	make CROSS_COMPILE=$(CROSS_COMPILER) distclean; 		\
 	make CROSS_COMPILE=$(CROSS_COMPILER) $(BOARD_DEFCONFIG);	\
-	make CROSS_COMPILE=$(CROSS_COMPILER) u-boot.bin;		
+	make CROSS_COMPILE=$(CROSS_COMPILER) u-boot.bin			\
 	"
 	@echo "Cross-Building for ARCH $(ARCH) with the compiler $(CROSS_COMPILER) completed"
 
@@ -61,4 +61,4 @@ clean:
 	@rm -rf ./src
 	@echo "Clening completed!"
 
-all: prepare build finalize
+all: prepare build
