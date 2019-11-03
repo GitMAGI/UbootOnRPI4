@@ -1,23 +1,22 @@
-.PHONY: shell prepare clean all
-
 SHELL:=/bin/bash
 CWD=$$(pwd)
 
 DOCKER=docker run -it -v $(CWD):/cwd
 
-UBOOT_URL=ftp://ftp.denx.de/pub/u-boot/
-UBOOT_V=2019.10
-DOCKER_IMG_NAME=arm64-source-compiler
+DOCKER_IMG_NAME=arm-source-compiler
 DOCKER_IMG_V=latest
 
-ARCH=arm64
-CROSS_COMPILER=aarch64-linux-gnu-
+UBOOT_GIT=https://gitlab.denx.de/u-boot/u-boot.git
+
+#ARCH=arm64
+#CROSS_COMPILER=aarch64-linux-gnu-
+
+ARCH=arm
+CROSS_COMPILER=arm-linux-gnueabihf-
 
 BOARD_TYPE=rpi4
-BOARD_DEFCONFIG=rpi_4_defconfig
-
-FIRMWARE_BIN_URL=https://github.com/raspberrypi/firmware/blob/master/boot/bootcode.bin
-FIRMWARE_ELF_URL=https://github.com/raspberrypi/firmware/blob/master/boot/start.elf
+#BOARD_DEFCONFIG=rpi_4_defconfig
+BOARD_DEFCONFIG=rpi_4_32b_defconfig
 
 shell:
 	$(DOCKER) --privileged $(DOCKER_IMG_NAME):$(DOCKER_IMG_V)
@@ -28,37 +27,38 @@ init:
 prepare:
 	@echo "Preparing ..."
 	@mkdir -m755 -p ./src/
-	@wget $(UBOOT_URL)u-boot-$(UBOOT_V).tar.bz2 -P ./src
-	@tar --no-same-owner -C ./src/ -xjf ./src/u-boot-$(UBOOT_V).tar.bz2
-	@rm -f ./src/u-boot-$(UBOOT_V).tar.bz2
+	@git clone $(UBOOT_GIT) ./src/u-boot
 	@echo "Preparation completed!"
 
 build:
 	@echo "Cross-Building for ARCH $(ARCH) with the compiler $(CROSS_COMPILER) starting ..."
 	$(DOCKER) --privileged $(DOCKER_IMG_NAME):$(DOCKER_IMG_V) -c	\
-	"								\
-	cd ./src/u-boot-$(UBOOT_V);					\
-	make CROSS_COMPILE=$(CROSS_COMPILER) distclean; 		\
-	make CROSS_COMPILE=$(CROSS_COMPILER) $(BOARD_DEFCONFIG);	\
-	make CROSS_COMPILE=$(CROSS_COMPILER) u-boot.bin			\
+	"																\
+	cd ./src/u-boot;												\
+	make CROSS_COMPILE=$(CROSS_COMPILER) $(BOARD_DEFCONFIG);		\
+	make CROSS_COMPILE=$(CROSS_COMPILER) -j8						\
 	"
 	@echo "Cross-Building for ARCH $(ARCH) with the compiler $(CROSS_COMPILER) completed"
 
 finalize:
-ifeq (,$(wildcard ./src/u-boot-$(UBOOT_V)/u-boot.bin))
-	$(error "File ./src/u-boot-$(UBOOT_V)/u-boot.bin does not exist. Run make build first")
+ifeq (,$(wildcard ./src/u-boot/u-boot.bin))
+	$(error "File ./src/u-boot/u-boot.bin does not exist. Run make build first")
 endif
+	@echo "Finalizing ..."
 	@mkdir -m755 -p ./build
 	@rm -f ./build/*
-	@cp ./src/u-boot-$(UBOOT_V)/u-boot.bin ./build/
-	@echo "console=serial0,115200 console=tty1 root=PARTUUID=6c586e13-02" > ./build/cmdline.txt
-	@echo "kernel=u-boot.bin" > ./build/config.txt
-	@wget $(FIRMWARE_BIN_URL) -P ./build
-	@wget $(FIRMWARE_ELF_URL) -P ./build
+	@cp ./src/u-boot/u-boot.bin ./build/
+	@cp ./asset/$(BOARD_TYPE)/config.txt ./build/
+	@echo "kernel=u-boot.bin" >> ./build/config.txt
+	@echo "enable_uart=1" >> ./build/config.txt	
+	@echo "Finalization complteted!"
 
 clean:
 	@echo "Cleaning ..."
-	@rm -rf ./src
+	@rm -rf ./build
+	$(DOCKER) --privileged $(DOCKER_IMG_NAME):$(DOCKER_IMG_V) -c	\
+	"                                                             	\
+	cd ./src/u-boot;												\
+	make CROSS_COMPILE=$(CROSS_COMPILER) clean              		\
+	"
 	@echo "Clening completed!"
-
-all: prepare build
