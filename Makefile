@@ -1,3 +1,4 @@
+.SILENT: build finalize help prepare clean
 SHELL:=/bin/bash
 CWD=$$(pwd)
 
@@ -11,12 +12,17 @@ UBOOT_GIT=https://gitlab.denx.de/u-boot/u-boot.git
 #ARCH=arm64
 #CROSS_COMPILER=aarch64-linux-gnu-
 
-ARCH=arm
-CROSS_COMPILER=arm-linux-gnueabihf-
+#ARCH=arm
+#CROSS_COMPILER=arm-linux-gnueabihf-
 
-BOARD_TYPE=rpi4
+#BOARD_TYPE=rpi_4
 #BOARD_DEFCONFIG=rpi_4_defconfig
-BOARD_DEFCONFIG=rpi_4_32b_defconfig
+#BOARD_DEFCONFIG=rpi_4_32b_defconfig
+
+help:
+	@echo USAGE: make ACTION CONFIGURATIONS
+	@echo "ACTIONS: init|prepare|build|finalize"
+	@echo "CONFIGURATIONS: ARCH=(arm|arm64) CROSS_COMPILER=(arm-linux-gnueabihf-|aarch64-linux-gnu-) BOARD_TYPE=(rpi_4) BOARD_DEFCONFIG=(rpi_4_defconfig|rpi_4_32b_defconfig)"
 
 shell:
 	$(DOCKER) --privileged $(DOCKER_IMG_NAME):$(DOCKER_IMG_V)
@@ -26,8 +32,10 @@ init:
 
 prepare:
 	@echo "Preparing ..."
+ifeq (,$(wildcard ./src/u-boot/))
 	@mkdir -m755 -p ./src/
 	@git clone $(UBOOT_GIT) ./src/u-boot
+endif
 	@echo "Preparation completed!"
 
 build:
@@ -47,10 +55,10 @@ endif
 	@echo "Finalizing ..."
 	@mkdir -m755 -p ./build
 	@rm -f ./build/*
-	@cp ./src/u-boot/u-boot.bin ./build/
-	@cp ./asset/$(BOARD_TYPE)/config.txt ./build/
-	@echo "kernel=u-boot.bin" >> ./build/config.txt
-	@echo "enable_uart=1" >> ./build/config.txt	
+	@cp ./src/u-boot/u-boot.bin ./build/u-boot-$(BOARD_DEFCONFIG:_defconfig=).bin
+	@cp ./asset/$(BOARD_TYPE)_$(ARCH)_config.txt ./build/config.txt
+	@echo "kernel=u-boot-$(BOARD_DEFCONFIG:_defconfig=).bin" >> ./build/config.txt
+	@echo "enable_uart=1" >> ./build/config.txt
 	@echo "Finalization complteted!"
 
 clean:
@@ -59,6 +67,6 @@ clean:
 	$(DOCKER) --privileged $(DOCKER_IMG_NAME):$(DOCKER_IMG_V) -c	\
 	"                                                             	\
 	cd ./src/u-boot;												\
-	make CROSS_COMPILE=$(CROSS_COMPILER) clean              		\
+	make clean              										\
 	"
 	@echo "Clening completed!"
